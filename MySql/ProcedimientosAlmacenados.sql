@@ -1,0 +1,437 @@
+USE PROYECTO_LP1;
+-- ---------------------------------------------------------
+-- PROCEDIMIENTOS ALMACENADOS PARA LAS ESTADISTICAS
+-- ---------------------------------------------------------
+DROP PROCEDURE IF EXISTS ListarDashboard;
+DELIMITER //
+CREATE PROCEDURE ListarDashboard()
+BEGIN
+  SELECT
+    (SELECT COUNT(*) FROM USUARIO) AS total_usuarios,
+    (SELECT COUNT(*) FROM USUARIO WHERE DATE(NOW()) = DATE(FECHA_REGISTRO)) AS usuarios_registrados_hoy,
+    (SELECT COUNT(*) FROM USUARIO WHERE ACTIVO = 0) AS usuarios_desactivados,
+    (SELECT COUNT(*) FROM CLIENTE) AS total_clientes,
+    (SELECT COUNT(*) FROM CLIENTE WHERE DATE(NOW()) = DATE(FECHA_REGISTRO)) AS clientes_registrados_hoy,
+    (SELECT COUNT(*) FROM PRODUCTOS) AS total_productos,
+    (SELECT COUNT(*) FROM PRODUCTOS WHERE DATE(NOW()) = DATE(FECHAREGISTRO)) AS productos_registrados_hoy,
+    (SELECT COUNT(*) FROM PRODUCTOS WHERE ACTIVO = 0) AS productos_desactivados;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS ObtenerClientesRegistradosPorDia;
+DELIMITER //
+CREATE PROCEDURE ObtenerClientesRegistradosPorDia()
+BEGIN
+  SELECT
+    SUM(CASE WHEN DAYOFWEEK(FECHA_REGISTRO) = 2 THEN 1 ELSE 0 END) AS 'LUNES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_REGISTRO) = 3 THEN 1 ELSE 0 END) AS 'MARTES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_REGISTRO) = 4 THEN 1 ELSE 0 END) AS 'MIERCOLES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_REGISTRO) = 5 THEN 1 ELSE 0 END) AS 'JUEVES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_REGISTRO) = 6 THEN 1 ELSE 0 END) AS 'VIERNES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_REGISTRO) = 7 THEN 1 ELSE 0 END) AS 'SABADO',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_REGISTRO) = 1 THEN 1 ELSE 0 END) AS 'DOMINGO'
+  FROM CLIENTE
+  WHERE YEARWEEK(FECHA_REGISTRO) = YEARWEEK(NOW())
+  ORDER BY DAYOFWEEK(FECHA_REGISTRO);
+END //
+DELIMITER ;
+-- ---------------------------------------------------------
+-- PROCEDIMIENTOS ALMACENADOS PARA LA TABLA USUARIOS
+-- ---------------------------------------------------------
+DROP PROCEDURE IF EXISTS BuscarUsuarioInic;
+DELIMITER //
+CREATE PROCEDURE BuscarUsuarioInic(
+  IN inicial VARCHAR(50)
+)
+BEGIN
+  SELECT U.*, C.DESC_CARGO
+  FROM USUARIO U
+  JOIN CARGO C ON U.COD_CARGO = C.COD_CARGO
+  WHERE U.NOMBRES LIKE CONCAT(inicial, '%')
+	AND U.ACTIVO = 1
+  ORDER BY U.COD_USUARIO ASC;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS RegistrarUsuario;
+DELIMITER //
+CREATE PROCEDURE RegistrarUsuario(
+  IN nombres VARCHAR(25),
+  IN apellidos VARCHAR(25),
+  IN telefono VARCHAR(15),
+  IN correo VARCHAR(60),
+  IN nombre_usuario VARCHAR(25),
+  IN contrasena NVARCHAR(25),
+  IN cod_cargo INT
+)
+BEGIN
+  DECLARE activo_val BIT(1) DEFAULT 1;
+
+  INSERT INTO USUARIO (NOMBRES, APELLIDOS, TELEFONO, CORREO, NOMBRE_USUARIO, CONTRASENA, COD_CARGO, ACTIVO)
+  VALUES (nombres, apellidos, telefono, correo, nombre_usuario, contrasena, cod_cargo, activo_val);
+  
+  SELECT LAST_INSERT_ID() AS COD_USUARIO;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS ActualizarUsuario;
+DELIMITER //
+CREATE PROCEDURE ActualizarUsuario(
+    IN p_COD_USUARIO INT,
+    IN p_NOMBRES VARCHAR(25),
+    IN p_APELLIDOS VARCHAR(25),
+    IN p_TELEFONO VARCHAR(15),
+    IN p_CORREO VARCHAR(60),
+    IN p_COD_CARGO INT
+)
+BEGIN
+    UPDATE USUARIO
+    SET NOMBRES = p_NOMBRES,
+        APELLIDOS = p_APELLIDOS,
+        TELEFONO = p_TELEFONO,
+        CORREO = p_CORREO,
+        COD_CARGO = p_COD_CARGO
+    WHERE COD_USUARIO = p_COD_USUARIO;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS DesactivarUsuario;
+DELIMITER //
+CREATE PROCEDURE DesactivarUsuario(
+    IN p_COD_USUARIO INT
+)
+BEGIN
+    UPDATE USUARIO
+    SET ACTIVO = 0
+    WHERE COD_USUARIO = p_COD_USUARIO;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS ListarUsuariosInactivos;
+DELIMITER //
+CREATE PROCEDURE ListarUsuariosInactivos()
+BEGIN
+  SELECT U.*, C.DESC_CARGO
+  FROM USUARIO U
+  INNER JOIN CARGO C ON U.COD_CARGO = C.COD_CARGO
+  WHERE U.ACTIVO = 0;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS ActivarUsuario;
+DELIMITER //
+CREATE PROCEDURE ActivarUsuario(
+    IN p_COD_USUARIO INT
+)
+BEGIN
+    UPDATE USUARIO
+    SET ACTIVO = 1
+    WHERE COD_USUARIO = p_COD_USUARIO;
+END //
+DELIMITER ;
+-- ---------------------------------------------------------
+-- PROCEDIMIENTOS ALMACENADOS PARA LA TABLA CLIENTES
+-- ---------------------------------------------------------
+DROP PROCEDURE IF EXISTS BuscarClientePorInicial;
+DELIMITER //
+CREATE PROCEDURE BuscarClientePorInicial(IN inicial VARCHAR(50))
+BEGIN
+  SELECT *
+  FROM CLIENTE
+  WHERE NOMBRES LIKE CONCAT(inicial, '%');
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS AgregarCliente;
+DELIMITER //
+CREATE PROCEDURE AgregarCliente(
+  IN pNombres VARCHAR(50),
+  IN pApellidos VARCHAR(50),
+  IN pDNI VARCHAR(9),
+  IN pTelefono VARCHAR(15),
+  IN pCorreo VARCHAR(100),
+  IN pDireccion VARCHAR(100)
+)
+BEGIN
+  INSERT INTO CLIENTE (NOMBRES, APELLIDOS, DNI, TELEFONO, CORREO, DIRECCION)
+  VALUES (pNombres, pApellidos, pDNI, pTelefono, pCorreo, pDireccion);
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS ActualizarCliente;
+DELIMITER //
+CREATE PROCEDURE ActualizarCliente(
+  IN pCodCliente INT,
+  IN pNombres VARCHAR(50),
+  IN pApellidos VARCHAR(50),
+  IN pDNI VARCHAR(9),
+  IN pTelefono VARCHAR(15),
+  IN pCorreo VARCHAR(100),
+  IN pDireccion VARCHAR(100)
+)
+BEGIN
+  UPDATE CLIENTE
+  SET NOMBRES = pNombres,
+      APELLIDOS = pApellidos,
+      DNI = pDNI,
+      TELEFONO = pTelefono,
+      CORREO = pCorreo,
+      DIRECCION = pDireccion
+  WHERE COD_CLIENTE = pCodCliente;
+END //
+DELIMITER ;
+-- ---------------------------------------------------------
+-- PROCEDIMIENTOS ALMACENADOS PARA LA TABLA PRODUCTOS
+-- ---------------------------------------------------------
+DROP PROCEDURE IF EXISTS BuscarProductoPorInicial;
+DELIMITER //
+CREATE PROCEDURE BuscarProductoPorInicial(IN inicial VARCHAR(50))
+BEGIN
+  SELECT P.*, C.NOMBRE_CATEGORIA
+  FROM PRODUCTOS P
+  INNER JOIN CATEGORIA C ON P.COD_CATEGORIA = C.COD_CATEGORIA
+  WHERE P.NOMBRE_PRODUCTO LIKE CONCAT(inicial, '%') AND P.ACTIVO = 1;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS BuscarProductoInactivos;
+DELIMITER //
+CREATE PROCEDURE BuscarProductoInactivos()
+BEGIN
+  SELECT P.*, C.NOMBRE_CATEGORIA
+  FROM PRODUCTOS P
+  INNER JOIN CATEGORIA C ON P.COD_CATEGORIA = C.COD_CATEGORIA
+  WHERE P.ACTIVO = 0;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS ActivarProducto;
+DELIMITER //
+CREATE PROCEDURE ActivarProducto(
+  IN pCodProducto INT,
+  IN pStock INT
+)
+BEGIN
+  IF pStock > 0 THEN
+    UPDATE PRODUCTOS
+    SET ACTIVO = 1, STOCK = pStock
+    WHERE COD_PRODUCTO = pCodProducto;
+  ELSE
+    UPDATE PRODUCTOS
+    SET ACTIVO = 0, STOCK = pStock
+    WHERE COD_PRODUCTO = pCodProducto;
+  END IF;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS AgregarProducto;
+DELIMITER //
+CREATE PROCEDURE AgregarProducto(
+    IN categoria INT,
+    IN nombre VARCHAR(60),
+    IN stock INT,
+    IN fechaVencimiento DATE,
+    IN precio DOUBLE
+)
+BEGIN
+    DECLARE activo BIT(1);
+    SET activo = 1;
+    
+    INSERT INTO PRODUCTOS (COD_CATEGORIA, NOMBRE_PRODUCTO, STOCK, FECHA_VENCIMIENTO, PRECIO, ACTIVO, FECHAREGISTRO)
+    VALUES (categoria, nombre, stock, fechaVencimiento, precio, activo, CURRENT_DATE());
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS ActualizarProducto;
+DELIMITER //
+CREATE PROCEDURE ActualizarProducto(
+    IN codigo INT,
+    IN categoria INT,
+    IN nombre VARCHAR(60),
+    IN stock INT,
+    IN fechaVencimiento DATE,
+    IN precio DOUBLE
+)
+BEGIN
+    UPDATE PRODUCTOS
+    SET COD_CATEGORIA = categoria,
+        NOMBRE_PRODUCTO = nombre,
+        STOCK = stock,
+        FECHA_VENCIMIENTO = fechaVencimiento,
+        PRECIO = precio
+    WHERE COD_PRODUCTO = codigo;
+END //
+DELIMITER ;
+
+DROP PROCEDURE IF EXISTS DesactivarProducto;
+DELIMITER //
+CREATE PROCEDURE DesactivarProducto(
+    IN codigo INT
+)
+BEGIN
+    UPDATE PRODUCTOS
+    SET ACTIVO = 0,
+        STOCK = 0
+    WHERE COD_PRODUCTO = codigo;
+END //
+DELIMITER ;
+-- ---------------------------------------------------------
+-- PROCEDIMIENTOS ALMACENADOS PARA LA TABLA PRODUCTOS
+-- ---------------------------------------------------------
+-- CREAMOS UN PROCEDIMIENTO ALMACENADO PARA RESTAR LA CANTIDAD DE PRODUCTO DEL PEDIDO
+DELIMITER //
+CREATE PROCEDURE RestarCantidadProducto(
+    IN p_cod_producto INT,
+    IN p_cantidad INT
+)
+BEGIN
+    UPDATE PRODUCTOS
+    SET STOCK = STOCK - p_cantidad
+    WHERE COD_PRODUCTO = p_cod_producto;
+END //
+DELIMITER ;
+
+CALL RestarCantidadProducto(1,2);
+
+-- CREAMOS UN PROCEDIMIENTO ALMACENADO PARA SUMAR LA CANTIDAD DE PRODUCTO DEL PEDIDO
+DELIMITER //
+CREATE PROCEDURE SumarCantidadProducto(
+    IN p_cod_producto INT,
+    IN p_cantidad INT
+)
+BEGIN
+    UPDATE PRODUCTOS
+    SET STOCK = STOCK + p_cantidad
+    WHERE COD_PRODUCTO = p_cod_producto;
+END //
+DELIMITER ;
+
+/* DESACTIVAMOS AUTOMATICAMENTE SI EL PRODUCTO LLEGA A 0 DE STOCK */
+DROP TRIGGER IF EXISTS trg_desactivar_producto;
+DELIMITER //
+CREATE TRIGGER trg_desactivar_producto
+BEFORE UPDATE ON PRODUCTOS
+FOR EACH ROW
+BEGIN
+    IF NEW.STOCK = 0 THEN
+        SET NEW.ACTIVO = 0;
+    END IF;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE ObtenerPedidosRegistradosPorDia()
+BEGIN
+  SELECT
+    SUM(CASE WHEN DAYOFWEEK(FECHA_PEDIDO) = 2 THEN 1 ELSE 0 END) AS 'LUNES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_PEDIDO) = 3 THEN 1 ELSE 0 END) AS 'MARTES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_PEDIDO) = 4 THEN 1 ELSE 0 END) AS 'MIERCOLES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_PEDIDO) = 5 THEN 1 ELSE 0 END) AS 'JUEVES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_PEDIDO) = 6 THEN 1 ELSE 0 END) AS 'VIERNES',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_PEDIDO) = 7 THEN 1 ELSE 0 END) AS 'SABADO',
+    SUM(CASE WHEN DAYOFWEEK(FECHA_PEDIDO) = 1 THEN 1 ELSE 0 END) AS 'DOMINGO'
+  FROM PEDIDOS
+  WHERE YEARWEEK(FECHA_PEDIDO) = YEARWEEK(NOW())
+  ORDER BY DAYOFWEEK(FECHA_PEDIDO);
+END //
+DELIMITER ;
+
+-- CALL ObtenerPedidosRegistradosPorDia();
+
+/* */
+
+DELIMITER //
+CREATE PROCEDURE RegistrarPedido(
+    IN cliente_id INT,
+    IN usuario_id INT,
+    IN monto DOUBLE
+)
+BEGIN
+    DECLARE estado_id CHAR(3);
+    
+    SELECT COD_ESTADO INTO estado_id FROM ESTADO WHERE NOMBRE = 'EMITIDO';
+    
+    INSERT INTO PEDIDOS (COD_CLIENTE, COD_USUARIO, MONTO, COD_ESTADO)
+    VALUES (cliente_id, usuario_id, monto, estado_id);
+    
+    SELECT LAST_INSERT_ID() AS COD_PEDIDO;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE CrearDetallePedido(
+    IN pedido_id INT,
+    IN producto_id INT,
+    IN cantidad INT,
+    IN precio_venta DOUBLE
+)
+BEGIN
+    INSERT INTO DETALLE_PEDIDO (COD_PEDIDO, COD_PRODUCTO, CANTIDAD, PRECIO_VENTA)
+    VALUES (pedido_id, producto_id, cantidad, precio_venta);
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE ListarPedidosPorCliente(IN inicial VARCHAR(50))
+BEGIN
+    SELECT p.COD_PEDIDO, p.COD_CLIENTE, c.NOMBRES AS NOMBRE_CLIENTE, c.APELLIDOS, p.COD_USUARIO, p.MONTO, p.COD_ESTADO, p.FECHA_PEDIDO, e.NOMBRE, u.NOMBRES, u.APELLIDOS
+    FROM PEDIDOS p
+    INNER JOIN CLIENTE c ON p.COD_CLIENTE = c.COD_CLIENTE
+    INNER JOIN ESTADO e ON p.COD_ESTADO = e.COD_ESTADO
+    INNER JOIN USUARIO u ON p.COD_USUARIO = u.COD_USUARIO
+    WHERE c.NOMBRES LIKE CONCAT(inicial, '%');
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE CambiarEstadoCancelar(IN pedidoId INT)
+BEGIN
+    UPDATE PEDIDOS
+    SET COD_ESTADO = 'CAN'
+    WHERE COD_PEDIDO = pedidoId;
+END //
+DELIMITER ;
+
+-- CALL CambiarEstadoCancelar(1);
+-- drop procedure CambiarEstadoCancelar;
+
+DELIMITER //
+CREATE PROCEDURE CambiarEstadoFinalizado(IN pedidoId INT)
+BEGIN
+    UPDATE PEDIDOS
+    SET COD_ESTADO = 'FIN'
+    WHERE COD_PEDIDO = pedidoId;
+END //
+DELIMITER ;
+
+-- CALL CambiarEstadoFinalizado(1);
+select * from pedidos
+
+
+DELIMITER //
+CREATE PROCEDURE ListarDetallePedidoReport(IN pedido_id INT)
+BEGIN
+    SELECT p.COD_PRODUCTO, p.NOMBRE_PRODUCTO, dp.CANTIDAD, dp.PRECIO_VENTA
+    FROM DETALLE_PEDIDO dp
+    INNER JOIN PRODUCTOS p ON dp.COD_PRODUCTO = p.COD_PRODUCTO
+    WHERE dp.COD_PEDIDO = pedido_id;
+END //
+DELIMITER ;
+
+DELIMITER //
+CREATE PROCEDURE ListarPedidoDetalleReport(IN pedido_id INT)
+BEGIN
+    SELECT c.NOMBRES, c.APELLIDOS, c.TELEFONO, c.DIRECCION, pe.COD_PEDIDO, pe.FECHA_PEDIDO, pe.MONTO, e.NOMBRE
+    FROM PEDIDOS pe
+    INNER JOIN CLIENTE c ON pe.COD_CLIENTE = c.COD_CLIENTE
+    INNER JOIN ESTADO e ON pe.COD_ESTADO = e.COD_ESTADO
+    WHERE pe.COD_PEDIDO = pedido_id;
+END //
+DELIMITER ;
+
+
+
+
+
+
+
